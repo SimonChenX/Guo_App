@@ -41,9 +41,13 @@ jobs:
           flutter-version: '3.47.4'
           channel: stable
           cache: true
-      - uses: egor-tensin/setup-mingw@v2
+      - uses: msys2/setup-msys2@v2
         with:
-          platform: x64
+          msystem: MINGW64
+          install: mingw-w64-x86_64-gcc
+      - name: Put MinGW-w64 on PATH
+        run: 'echo "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Append'
+      - run: gcc --version
       - run: python scripts/build_windows.py ${{ matrix.arguments }}
       - run: choco install ffmpeg --no-progress -y
       - run: python scripts/smoke_windows.py ${{ matrix.arguments }}
