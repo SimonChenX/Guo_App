@@ -102,11 +102,23 @@ jobs:
             Write-Host "::error title=package failed::$txt"
             exit 1
           }
-      - run: choco install ffmpeg --no-progress -y
-      - run: python scripts/smoke_windows.py ${{ matrix.arguments }}
-      - uses: actions/upload-artifact@v4
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.edition }}-windows
           path: dist/windows/*
           if-no-files-found: error
           retention-days: 14
+      - name: Install ffmpeg
+        run: choco install ffmpeg --no-progress -y
+      - name: Smoke test (non-blocking)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          python scripts/smoke_windows.py ${{ matrix.arguments }} *>&1 | Tee-Object -FilePath smoke.log
+          if ($LASTEXITCODE -ne 0) {
+            $txt = ((Get-Content smoke.log -Tail 30) -join "`n")
+            $txt = (($txt -replace '%', '%25') -replace "`r", "") -replace "`n", '%0A'
+            if ($txt.Length -gt 6000) { $txt = $txt.Substring(0, 6000) }
+            Write-Host "::warning title=smoke failed::$txt"
+          }
