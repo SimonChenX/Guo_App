@@ -14,6 +14,8 @@ permissions:
 env:
   GOPROXY: https://proxy.golang.org,direct
   GOSUMDB: sum.golang.org
+  # Windows Python defaults to cp1252; the build scripts read UTF-8 pubspec.yaml.
+  PYTHONUTF8: '1'
 
 jobs:
   windows:
