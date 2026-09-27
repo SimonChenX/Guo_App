@@ -1,7 +1,6 @@
 name: Build Windows (unsigned)
 
 # Standalone Windows build that does not depend on the `checks` gate in build.yml.
-# Trigger manually from the Actions tab or via pushing a change to this file.
 on:
   workflow_dispatch:
   push:
@@ -25,8 +24,10 @@ jobs:
         include:
           - edition: hongguojian
             arguments: ''
+            all_sources: 'false'
           - edition: zhenguojian
             arguments: '--all-sources'
+            all_sources: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -48,21 +49,30 @@ jobs:
       - name: Put MinGW-w64 on PATH
         run: 'echo "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Append'
       - run: gcc --version
-      - name: Build Windows package
+      - name: Build native core
+        run: |
+          python scripts/build_native.py --platform windows ${{ matrix.arguments }}
+          if (-not (Test-Path "windows/runner/duanju_core.dll")) { Write-Host "::error title=missing core::duanju_core.dll was not produced"; exit 1 }
+        shell: pwsh
+      - name: Flutter pub get
+        run: flutter pub get --enforce-lockfile
+      - name: Flutter build windows (verbose on failure)
         shell: pwsh
         run: |
-          python scripts/build_windows.py ${{ matrix.arguments }} *>&1 | Tee-Object -FilePath build.log
+          flutter build windows --release --no-pub --dart-define=ALL_SOURCES=${{ matrix.all_sources }} -v *>&1 | Tee-Object -FilePath build.log
           if ($LASTEXITCODE -ne 0) {
             $lines = Get-Content build.log
-            $pat = 'CMake Error|MSB3073|cannot find|fatal error|Failed to|error LNK|error C[0-9]|No such file|is missing|Error:'
-            $sel = $lines | Select-String -Pattern $pat | Select-Object -First 25 | ForEach-Object { $_.Line }
-            $block = if ($sel.Count) { $sel } else { $lines | Select-Object -Last 30 }
+            $pat = 'CMake Error|cannot find|MSB3073|fatal error|Failed to|error LNK|error C[0-9]|No such file|is missing|INSTALL |Error:'
+            $sel = $lines | Select-String -Pattern $pat | Select-Object -First 30 | ForEach-Object { $_.Line }
+            $block = if ($sel.Count) { $sel } else { $lines | Select-Object -Last 40 }
             $msg = (($block -join "`n") -replace "`r", "")
             $msg = ($msg -replace '%', '%25') -replace "`n", '%0A'
             if ($msg.Length -gt 6000) { $msg = $msg.Substring(0, 6000) }
             Write-Host "::error title=build_windows failed::$msg"
             exit 1
           }
+      - name: Package release
+        run: python scripts/package_release.py --platform windows ${{ matrix.arguments }}
       - run: choco install ffmpeg --no-progress -y
       - run: python scripts/smoke_windows.py ${{ matrix.arguments }}
       - uses: actions/upload-artifact@v4
