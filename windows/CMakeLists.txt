@@ -62,7 +62,14 @@ include(flutter/generated_plugins.cmake)
 # Support files are copied into place next to the executable, so that it can
 # run in place. This is done instead of making a separate bundle (as on Linux)
 # so that building and running from within Visual Studio will work.
-set(BUILD_BUNDLE_DIR "${CMAKE_BINARY_DIR}/runner/$<CONFIG>")
+# Use a concrete per-configuration path. A generator expression such as
+# $<TARGET_FILE_DIR:${BINARY_NAME}> is not expanded when it lands in
+# CMAKE_INSTALL_PREFIX, so install() would try to create a literal genex path.
+if(CMAKE_BUILD_TYPE)
+  set(BUILD_BUNDLE_DIR "${CMAKE_BINARY_DIR}/runner/${CMAKE_BUILD_TYPE}")
+else()
+  set(BUILD_BUNDLE_DIR "${CMAKE_BINARY_DIR}/runner/Release")
+endif()
 # Make the "install" step default, as it's required to run.
 set(CMAKE_VS_INCLUDE_INSTALL_TO_DEFAULT_BUILD 1)
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
