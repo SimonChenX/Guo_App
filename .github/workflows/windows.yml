@@ -62,9 +62,13 @@ jobs:
           flutter build windows --release --no-pub --dart-define=ALL_SOURCES=${{ matrix.all_sources }} -v *>&1 | Tee-Object -FilePath build.log
           if ($LASTEXITCODE -ne 0) {
             $lines = Get-Content build.log
-            $pat = 'CMake Error|cannot find|MSB3073|fatal error|Failed to|error LNK|error C[0-9]|No such file|is missing|INSTALL |Error:'
-            $sel = $lines | Select-String -Pattern $pat | Select-Object -First 30 | ForEach-Object { $_.Line }
-            $block = if ($sel.Count) { $sel } else { $lines | Select-Object -Last 40 }
+            $idx = ($lines | Select-String -Pattern 'CMake Error at cmake_install' | Select-Object -First 1).LineNumber
+            if ($idx) {
+              $end = [Math]::Min($lines.Count - 1, $idx + 10)
+              $block = $lines[($idx - 1)..$end]
+            } else {
+              $block = $lines | Select-String -Pattern 'CMake Error|cannot find|No such file|Failed to|error LNK|error C[0-9]' | Select-Object -First 20 | ForEach-Object { $_.Line }
+            }
             $msg = (($block -join "`n") -replace "`r", "")
             $msg = ($msg -replace '%', '%25') -replace "`n", '%0A'
             if ($msg.Length -gt 6000) { $msg = $msg.Substring(0, 6000) }
